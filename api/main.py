@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 import sqlite3
+from fastapi import Body
 from pathlib import Path
 import os
 app = FastAPI(title="Ecommerce API")
@@ -65,3 +66,56 @@ def orders(
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/kpis")
+def kpis(country: str | None = None, category: str | None = None):
+    sql = """
+    SELECT
+      COUNT(*) AS orders_count,
+      SUM(total_amount) AS revenue_total,
+      AVG(total_amount) AS avg_order_value
+    FROM orders
+    WHERE 1=1
+    """
+    params = {}
+
+    if country:
+        sql += " AND country = :country"
+        params["country"] = country
+    if category:
+        sql += " AND category = :category"
+        params["category"] = category
+
+    conn = get_conn()
+    row = conn.execute(sql, params).fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.get("/filters")
+def filters():
+    conn = get_conn()
+    countries = [r["country"] for r in conn.execute("SELECT DISTINCT country FROM orders ORDER BY country").fetchall()]
+    categories = [r["category"] for r in conn.execute("SELECT DISTINCT category FROM orders ORDER BY category").fetchall()]
+    conn.close()
+    return {"countries": countries, "categories": categories}
+
+
+
+@app.post("/orders")
+def add_order(order: dict = Body(...)):
+    sql = """
+    INSERT INTO orders
+    (country, category, unit_price, quantity, order_date, total_amount)
+    VALUES (:country, :category, :unit_price, :quantity, :order_date, :total_amount)
+    """
+
+    order["total_amount"] = order["unit_price"] * order["quantity"]
+
+    conn = get_conn()
+    conn.execute(sql, order)
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "message": "Order added"}
