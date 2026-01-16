@@ -1,0 +1,12 @@
+# Python
+.venv/
+__pycache__/
+
+# Database
+db/*.db
+
+# Docker
+*.log
+
+# OS
+.DS_Store
